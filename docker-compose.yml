@@ -1,0 +1,10 @@
+version: "3.9"
+
+services:
+  churn-api:
+    build: .
+    container_name: churn_fastapi
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app

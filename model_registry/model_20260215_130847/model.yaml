@@ -1,0 +1,78 @@
+model_type: RandomForestClassifier
+training_timestamp: '2026-02-15T13:08:47.444335'
+random_state: 42
+test_size: 0.2
+cross_validation_folds: 10
+n_features: 16
+features:
+- num__customer_id
+- num__age
+- num__tenure_months
+- num__monthly_charges
+- num__total_charges
+- num__support_calls
+- num__late_payments
+- num__avg_monthly_value
+- num__support_call_ratio
+- num__payment_risk
+- cat__contract_type_Month-to-month
+- cat__contract_type_One year
+- cat__contract_type_Two year
+- cat__internet_service_DSL
+- cat__internet_service_Fiber optic
+- cat__internet_service_No
+hyperparameters:
+  bootstrap: true
+  ccp_alpha: 0.0
+  class_weight: null
+  criterion: gini
+  max_depth: 10
+  max_features: sqrt
+  max_leaf_nodes: null
+  max_samples: null
+  min_impurity_decrease: 0.0
+  min_samples_leaf: 2
+  min_samples_split: 5
+  min_weight_fraction_leaf: 0.0
+  monotonic_cst: null
+  n_estimators: 200
+  n_jobs: -1
+  oob_score: false
+  random_state: 42
+  verbose: 0
+  warm_start: false
+feature_importance:
+  num__customer_id: 0.03854005415598289
+  num__age: 0.02743335803204904
+  num__tenure_months: 0.05705673678336918
+  num__monthly_charges: 0.03532938212679738
+  num__total_charges: 0.04663534041685495
+  num__support_calls: 0.03899324972217296
+  num__late_payments: 0.013296809558389217
+  num__avg_monthly_value: 0.03496832833403296
+  num__support_call_ratio: 0.029838867293426316
+  num__payment_risk: 0.0064297975805809385
+  cat__contract_type_Month-to-month: 0.24860864885163453
+  cat__contract_type_One year: 0.09335380777039827
+  cat__contract_type_Two year: 0.05736667446382827
+  cat__internet_service_DSL: 0.08201724676027375
+  cat__internet_service_Fiber optic: 0.17165241971937287
+  cat__internet_service_No: 0.01847927843083649
+test_metrics:
+  accuracy: 0.66475
+  precision: 0.594675045477096
+  recall: 0.4580891719745223
+  f1_score: 0.5175217672879039
+  roc_auc: 0.628180388456397
+  confusion_matrix:
+  - - 9699
+    - 2451
+  - - 4254
+    - 3596
+cross_validation_metrics:
+  cv_accuracy_mean: 0.6634
+  cv_accuracy_std: 0.0055084594034993
+  cv_f1_mean: 0.5129606807843332
+  cv_f1_std: 0.01100760673275537
+  cv_auc_mean: 0.6976299054640046
+  cv_auc_std: 0.005587322159721528
