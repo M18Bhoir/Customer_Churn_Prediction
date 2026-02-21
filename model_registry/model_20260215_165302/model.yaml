@@ -1,0 +1,76 @@
+model_type: RandomForestClassifier
+training_timestamp: '2026-02-15T16:53:02.261233'
+random_state: 42
+test_size: 0.2
+cross_validation_folds: 10
+n_features: 15
+features:
+- num__customer_id
+- num__age
+- num__tenure_months
+- num__monthly_charges
+- num__total_charges
+- num__support_calls
+- num__late_payments
+- num__avg_monthly_value
+- num__support_call_ratio
+- cat__contract_type_Month-to-month
+- cat__contract_type_One year
+- cat__contract_type_Two year
+- cat__internet_service_DSL
+- cat__internet_service_Fiber optic
+- cat__internet_service_No
+hyperparameters:
+  bootstrap: true
+  ccp_alpha: 0.0
+  class_weight: null
+  criterion: gini
+  max_depth: 10
+  max_features: sqrt
+  max_leaf_nodes: null
+  max_samples: null
+  min_impurity_decrease: 0.0
+  min_samples_leaf: 2
+  min_samples_split: 5
+  min_weight_fraction_leaf: 0.0
+  monotonic_cst: null
+  n_estimators: 200
+  n_jobs: -1
+  oob_score: false
+  random_state: 42
+  verbose: 0
+  warm_start: false
+feature_importance:
+  num__customer_id: 0.036029255656922166
+  num__age: 0.02621273811271867
+  num__tenure_months: 0.053683097043451956
+  num__monthly_charges: 0.03334036355763988
+  num__total_charges: 0.04510207825776624
+  num__support_calls: 0.038223003079758844
+  num__late_payments: 0.01721922483746757
+  num__avg_monthly_value: 0.03402745299773479
+  num__support_call_ratio: 0.030788919838209163
+  cat__contract_type_Month-to-month: 0.23451135193344172
+  cat__contract_type_One year: 0.11006490872690038
+  cat__contract_type_Two year: 0.06378611996646216
+  cat__internet_service_DSL: 0.08286385955342293
+  cat__internet_service_Fiber optic: 0.17477788859292318
+  cat__internet_service_No: 0.01936973784518035
+test_metrics:
+  accuracy: 0.66525
+  precision: 0.5968147527242247
+  recall: 0.4535031847133758
+  f1_score: 0.5153818313427434
+  roc_auc: 0.62778039894105
+  confusion_matrix:
+  - - 9745
+    - 2405
+  - - 4290
+    - 3560
+cross_validation_metrics:
+  cv_accuracy_mean: 0.6632
+  cv_accuracy_std: 0.005193505559831424
+  cv_f1_mean: 0.509958377157696
+  cv_f1_std: 0.00992357042456446
+  cv_auc_mean: 0.6981839727078444
+  cv_auc_std: 0.005670278608378241
