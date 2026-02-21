@@ -9,7 +9,7 @@ data/processed/*
 !data/raw/.keep
 !data/processed/.keep
 
-model_registry/saved_models/*.pkl
+model_registry/
 
 *.log
 .DS_Store
