@@ -32,7 +32,7 @@ training:
   cross_validation_folds: 10
 
   model:
-    type: random_forest   # options: logistic_regression | random_forest
+    type: logistic_regression   # options: logistic_regression | random_forest
 
     logistic_regression:
       penalty: l2
