@@ -2,9 +2,18 @@ version: "3.9"
 
 services:
   churn-api:
-    build: .
+    build:
+      context: .                 #project root
+      dockerfile: app/Dockerfile
     container_name: churn_fastapi
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    working_dir: /app
     ports:
       - "8000:8000"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - ENV=development
     volumes:
-      - .:/app
+      - ./app:/app/app
+      - ./model_registry:/app/model_registry
+    restart: unless-stopped

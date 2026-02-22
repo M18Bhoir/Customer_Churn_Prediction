@@ -9,3 +9,6 @@ xgboost
 matplotlib
 seaborn
 tqdm
+plotly
+imblearn
+pytest
