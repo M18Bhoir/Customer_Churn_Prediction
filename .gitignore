@@ -1,18 +1,24 @@
-__pycache__/
-*.pyc
-.ipynb_checkpoints/
-.env
-venv/
+# VS Code settings
+.vscode/
 
-data/raw/*
-data/processed/*
-!data/raw/.keep
-!data/processed/.keep
+# Log files
+*.log
 
+# CSV files
+*.csv
+
+# Data directory
+data/
+
+# Model registry directory
 model_registry/
 
-*.log
-.DS_Store
-.vscode/
-.idea/
-.vscode/
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+#ipynb checkpoints
+.ipynb_checkpoints
+
+results/
