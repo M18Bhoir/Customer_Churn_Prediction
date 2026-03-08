@@ -21,7 +21,6 @@ data:
 
   allowed_missing_pct: 0.2
 
-
 training:
   save_model: true
   model_registry_path: model_registry
@@ -30,9 +29,17 @@ training:
   test_size: 0.2
   target_column: churn
   cross_validation_folds: 10
+  apply_smote: true
+  exclude_columns:
+    - customer_id
+    - age
+    - monthly_charges
+    - avg_monthly_value
+    - support_call_ratio
+    - payment_risk
 
   model:
-    type: logistic_regression   # options: logistic_regression | random_forest
+    type: xgboost # options: logistic_regression | random_forest | xgboost
 
     logistic_regression:
       penalty: l2
@@ -51,6 +58,16 @@ training:
       bootstrap: true
       n_jobs: -1
 
+    xgboost:
+      n_estimators: 200
+      max_depth: 6
+      learning_rate: 0.1
+      subsample: 0.8
+      colsample_bytree: 0.8
+      gamma: 0
+      min_child_weight: 1
+      random_state: 42
+      n_jobs: -1
 
 evaluation:
   metrics:

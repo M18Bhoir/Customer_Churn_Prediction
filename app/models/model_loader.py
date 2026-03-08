@@ -13,14 +13,19 @@ class ModelLoader:
     
     def __init__(self):
         self.model: Optional[Any] = None
+        self.pipeline: Optional[Any] = None  # Complete preprocessing + model pipeline
         self.preprocessor: Optional[Any] = None
         self.model_version: Optional[str] = None
         self.model_loaded_at: Optional[datetime] = None
         self.model_path: Optional[Path] = None
+        self.is_complete_pipeline: bool = False  # Flag to indicate if model includes preprocessing
     
     def load_latest_model(self) -> bool:
         """
         Load the latest model from model registry
+        
+        Tries to load complete_pipeline.pkl first (preprocessing + model),
+        falls back to model.pkl if not available
         
         Returns:
             True if model loaded successfully, False otherwise
@@ -32,7 +37,7 @@ class ModelLoader:
                 logger.error(f"Model registry path does not exist: {registry_path}")
                 return False
             
-                        # Find folders matching pattern model_YYYYMMDD_HHMMSS
+            # Find folders matching pattern model_YYYYMMDD_HHMMSS
             model_folders = [
                 f for f in registry_path.iterdir()
                 if f.is_dir() and re.match(r"model_\d{8}_\d{6}", f.name)
@@ -51,20 +56,38 @@ class ModelLoader:
 
             logger.info(f"Loading latest model folder: {latest_folder}")
             
-            # Load the model
-            latest_model_file = latest_folder / "model.pkl"
-            logger.info(f"Loading model file: {latest_model_file}")
-            self.model = joblib.load(latest_model_file)
-            self.model_path = latest_model_file
+            # Try to load complete_pipeline.pkl first (includes preprocessing + model)
+            complete_pipeline_file = latest_folder / "complete_pipeline.pkl"
             
-            # Extract version from filename (e.g., churn_model_v1.0.0.joblib -> v1.0.0)
-            version_match = '_'.join(str(latest_folder).split("\\")[-1].split("_")[-2:])  # Get timestamp part
+            if complete_pipeline_file.exists():
+                logger.info(f"Loading complete pipeline: {complete_pipeline_file}")
+                self.model = joblib.load(complete_pipeline_file)
+                self.pipeline = self.model
+                self.is_complete_pipeline = True
+                self.model_path = complete_pipeline_file
+                logger.info("Loaded complete unified pipeline (preprocessing + model)")
+            else:
+                # Fall back to loading just the model
+                model_file = latest_folder / "model.pkl"
+                if not model_file.exists():
+                    logger.error(f"No model files found in {latest_folder}")
+                    return False
+                
+                logger.info(f"Loading model file: {model_file}")
+                self.model = joblib.load(model_file)
+                self.model_path = model_file
+                self.is_complete_pipeline = False
+                logger.info("Loaded model (preprocessing may be needed separately)")
+            
+            # Extract version from folder name timestamp
+            version_match = '_'.join(str(latest_folder).split("\\")[-1].split("_")[-2:])
             self.model_version = version_match if version_match else "unknown"
             
             self.model_loaded_at = datetime.now()
             
             logger.info(f"Model loaded successfully: version={self.model_version}, "
-                       f"type={type(self.model).__name__}")
+                       f"type={type(self.model).__name__}, "
+                       f"complete_pipeline={self.is_complete_pipeline}")
             
             return True
             
@@ -84,7 +107,8 @@ class ModelLoader:
                 "status": "not_loaded",
                 "version": None,
                 "model_type": None,
-                "loaded_at": None
+                "loaded_at": None,
+                "is_complete_pipeline": False
             }
         
         return {
@@ -92,12 +116,14 @@ class ModelLoader:
             "version": self.model_version,
             "model_type": type(self.model).__name__,
             "loaded_at": self.model_loaded_at.isoformat() if self.model_loaded_at else None,
-            "model_file": str(self.model_path) if self.model_path else None
+            "model_file": str(self.model_path) if self.model_path else None,
+            "is_complete_pipeline": self.is_complete_pipeline
         }
     
     def is_loaded(self) -> bool:
         """Check if model is loaded"""
         return self.model is not None
+
 
 
 # Global model loader instance

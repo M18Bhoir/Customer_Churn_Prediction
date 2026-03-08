@@ -7,10 +7,11 @@ from app.core.logger import logger
 from app.models.model_loader import model_loader
 from app.schemas.request import CustomerData
 from app.schemas.response import PredictionResponse
+from app.services.preprocessing_service import preprocessing_service
 
 
 class PredictionService:
-    """Service for handling prediction logic"""
+    """Service for handling prediction logic with unified preprocessing + model pipeline"""
     
     @staticmethod
     def _determine_risk_level(probability: float) -> str:
@@ -31,7 +32,7 @@ class PredictionService:
             return "Low"
     
     @staticmethod
-    def _preprocess_input(customer: CustomerData) -> pd.DataFrame:
+    def _preprocess_input(customer: CustomerData) -> Tuple[pd.DataFrame, int]:
         """
         Convert customer data to DataFrame for model input
         
@@ -39,7 +40,7 @@ class PredictionService:
             customer: Customer data
             
         Returns:
-            DataFrame with customer features
+            Tuple of (DataFrame with customer features, customer_id)
         """
         # Convert to dict and create DataFrame
         customer_dict = customer.model_dump()
@@ -47,14 +48,21 @@ class PredictionService:
         
         df = pd.DataFrame([customer_dict])
         
-        logger.debug(f"Preprocessed input for customer {customer_id}: {df.to_dict()}")
+        logger.debug(f"Preprocessed input for customer {customer_id}: shape={df.shape}")
         
         return df, customer_id
     
     @staticmethod
     def predict(customer: CustomerData) -> PredictionResponse:
         """
-        Make churn prediction for a customer
+        Make churn prediction for a customer using unified pipeline
+        
+        The preprocessing pipeline handles:
+        1. Column exclusion (customer_id, age, monthly_charges)
+        2. Missing value imputation
+        3. Categorical label encoding
+        4. Numerical transformation (scaling)
+        5. Model prediction (XGBoost)
         
         Args:
             customer: Customer data
@@ -71,24 +79,33 @@ class PredictionService:
             raise ValueError("Model is not loaded. Please check model registry.")
         
         try:
-            # Preprocess input
+            # Convert input to DataFrame
             df, customer_id = PredictionService._preprocess_input(customer)
             
-            # Apply preprocessor if available
-            if model_loader.preprocessor is not None:
-                logger.debug("Applying preprocessor to input data")
-                X = model_loader.preprocessor.transform(df)
-            else:
-                X = df.values
+            logger.debug(f"Input DataFrame shape: {df.shape}, Columns: {df.columns.tolist()}")
             
-            # Make prediction
-            prediction = model_loader.model.predict(X)[0]
-            
-            # Get probability
-            if hasattr(model_loader.model, 'predict_proba'):
-                probability = model_loader.model.predict_proba(X)[0][1]
+            # Apply preprocessing using unified pipeline
+            if model_loader.is_complete_pipeline:
+                logger.debug("Using complete unified pipeline (preprocessing + model)")
+                # The pipeline handles all preprocessing internally
+                prediction = model_loader.pipeline.predict(df)[0]
+                
+                if hasattr(model_loader.pipeline, 'predict_proba'):
+                    probability = model_loader.pipeline.predict_proba(df)[0][1]
+                else:
+                    probability = float(prediction)
             else:
-                probability = float(prediction)
+                logger.debug("Using preprocessing service + model")
+                # Apply preprocessing pipeline
+                X = preprocessing_service.preprocess(df)
+                
+                # Use the model for prediction
+                prediction = model_loader.model.predict(X)[0]
+                
+                if hasattr(model_loader.model, 'predict_proba'):
+                    probability = model_loader.model.predict_proba(X)[0][1]
+                else:
+                    probability = float(prediction)
             
             # Determine risk level
             risk_level = PredictionService._determine_risk_level(probability)
@@ -112,3 +129,4 @@ class PredictionService:
 
 # Global service instance
 prediction_service = PredictionService()
+
