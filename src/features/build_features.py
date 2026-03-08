@@ -7,8 +7,9 @@ from sklearn.pipeline import Pipeline
 from src.logger.logger import get_logger
 from src.schema.data_schema import DataConfig
 from src.features.transformers import (
+    ColumnExcluder,
     MissingValueImputer,
-    FeatureGenerator
+    CategoricalLabelEncoder
 )
 
 logger = get_logger(__name__)
@@ -19,7 +20,9 @@ class FeatureBuilder:
     Feature Engineering Pipeline
 
     Responsibilities:
+    - Exclude specified columns
     - Apply transformations
+    - Encode categorical variables
     - Generate features
     - Save processed dataset
     """
@@ -33,10 +36,15 @@ class FeatureBuilder:
             exist_ok=True
         )
 
+        # Get exclude columns from training config if available
+        exclude_columns = config.get("training", {}).get("exclude_columns", 
+                                                          ["customer_id", "age", "monthly_charges"])
+
         self.pipeline = Pipeline(
             steps=[
+                ("column_excluder", ColumnExcluder(exclude_columns=exclude_columns)),
                 ("imputer", MissingValueImputer()),
-                ("feature_generator", FeatureGenerator())
+                ("label_encoder", CategoricalLabelEncoder())
             ]
         )
 
@@ -59,3 +67,4 @@ class FeatureBuilder:
         )
 
         return processed_df
+

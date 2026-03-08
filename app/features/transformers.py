@@ -182,5 +182,3 @@ class FeatureGenerator(BaseEstimator, TransformerMixin):
         #     )
 
         return X
-
-

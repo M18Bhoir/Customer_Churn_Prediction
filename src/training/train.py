@@ -12,15 +12,20 @@ from sklearn.model_selection import (
     cross_validate,
 )
 from sklearn.pipeline import Pipeline
-from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
-from sklearn.preprocessing import StandardScaler, OneHotEncoder
-from sklearn.impute import SimpleImputer
+from xgboost import XGBClassifier
+from imblearn.over_sampling import SMOTE
 
 from src.logger.logger import get_logger
 from src.schema.train_schema import TrainConfig
 from src.training.evaluate import Evaluator
+from src.features.transformers import (
+    ColumnExcluder,
+    MissingValueImputer,
+    CategoricalLabelEncoder,
+    NumericalTransformer,
+)
 from tqdm import tqdm
 from sklearn.metrics import (
     accuracy_score,
@@ -34,7 +39,7 @@ logger = get_logger(__name__)
 
 class Trainer:
     """
-    Industrial-grade Trainer with Cross Validation
+    Industrial-grade Trainer with unified preprocessing + model pipeline, SMOTE, and XGBoost support
     """
 
     def __init__(self, config: dict):
@@ -46,68 +51,46 @@ class Trainer:
         logger.info("Trainer initialized successfully")
 
     # =========================================================
-    # Pipeline Builder
+    # Unified Pipeline Builder (Preprocessing + Model)
     # =========================================================
-    def _build_pipeline(self, X: pd.DataFrame) -> Pipeline:
+    def _build_pipeline(self) -> Pipeline:
+        """
+        Build a unified preprocessing + model pipeline
+        """
 
-        numeric_features = X.select_dtypes(
-            include=["int64", "float64"]
-        ).columns.tolist()
+        # Preprocessing steps
+        preprocessing_steps = [
+            ("column_excluder", ColumnExcluder(exclude_columns=self.config.exclude_columns)),
+            ("imputer", MissingValueImputer()),
+            ("categorical_encoder", CategoricalLabelEncoder()),
+            ("numerical_transformer", NumericalTransformer())
+        ]
 
-        categorical_features = X.select_dtypes(
-            include=["object", "category"]
-        ).columns.tolist()
-
-        logger.info(f"Numeric features: {numeric_features}")
-        logger.info(f"Categorical features: {categorical_features}")
-
-        numeric_transformer = Pipeline(
-            steps=[
-                ("imputer", SimpleImputer(strategy="median")),
-                ("scaler", StandardScaler())
-            ]
-        )
-
-        categorical_transformer = Pipeline(
-            steps=[
-                ("imputer", SimpleImputer(strategy="most_frequent")),
-                (
-                    "encoder",
-                    OneHotEncoder(
-                        handle_unknown="ignore",
-                        sparse_output=False
-                    )
-                )
-            ]
-        )
-
-        preprocessor = ColumnTransformer(
-            transformers=[
-                ("num", numeric_transformer, numeric_features),
-                ("cat", categorical_transformer, categorical_features)
-            ],
-            remainder="drop"
-        )
-
+        # Select model based on config
         model_type = self.config.model.type
         model_config = self.config.model
 
         if model_type == "random_forest":
-
             rf_params = model_config.random_forest.dict()
-
             model = RandomForestClassifier(
                 **rf_params,
                 random_state=self.config.random_state
             )
 
         elif model_type == "logistic_regression":
-
             lr_params = model_config.logistic_regression.dict()
-
             model = LogisticRegression(
                 **lr_params,
                 random_state=self.config.random_state
+            )
+
+        elif model_type == "xgboost":
+            xgb_params = model_config.xgboost.dict()
+            xgb_params.pop('random_state', None)
+            model = XGBClassifier(
+                **xgb_params,
+                random_state=self.config.random_state,
+                eval_metric='logloss'
             )
 
         else:
@@ -115,21 +98,32 @@ class Trainer:
 
         logger.info(f"Using model: {model_type}")
 
-        pipeline = Pipeline(
-            steps=[
-                ("preprocessor", preprocessor),
-                ("model", model),
-            ]
-        )
+        # Add model to pipeline
+        preprocessing_steps.append(("model", model))
+
+        # Create unified pipeline
+        pipeline = Pipeline(steps=preprocessing_steps)
 
         return pipeline
 
     # =========================================================
-    # Extract Transformed Feature Names
+    # Extract Feature Names
     # =========================================================
-    def _get_feature_names(self, pipeline: Pipeline) -> list:
-        preprocessor = pipeline.named_steps["preprocessor"]
-        return preprocessor.get_feature_names_out().tolist()
+    def _get_feature_names(self, pipeline: Pipeline, X_sample: pd.DataFrame) -> list:
+        """
+        Get feature names after preprocessing by fitting on sample
+        """
+        try:
+            # Apply all transformers except the model
+            X_transformed = X_sample.copy()
+            
+            for name, transformer in pipeline.named_steps.items():
+                if name != "model":
+                    X_transformed = transformer.transform(X_transformed)
+            
+            return X_transformed.columns.tolist() if isinstance(X_transformed, pd.DataFrame) else [f"feature_{i}" for i in range(X_transformed.shape[1])]
+        except:
+            return [f"feature_{i}" for i in range(100)]
 
     # =========================================================
     # Metadata Extraction
@@ -151,6 +145,9 @@ class Trainer:
             "n_features": len(feature_names),
             "features": feature_names,
             "hyperparameters": model.get_params(),
+            "smote_applied": self.config.apply_smote,
+            "excluded_columns": self.config.exclude_columns,
+            "preprocessing_pipeline": True,
         }
 
         if hasattr(model, "feature_importances_"):
@@ -159,14 +156,19 @@ class Trainer:
             )
 
         elif hasattr(model, "coef_"):
-            metadata["coefficients"] = dict(
-                zip(feature_names, model.coef_[0].tolist())
-            )
+            try:
+                metadata["coefficients"] = dict(
+                    zip(feature_names, model.coef_[0].tolist())
+                )
+            except:
+                pass
 
         return metadata
 
-    #cross validation
-    def model_cross_validation(self,pipeline, X, y) -> Dict[str, float]:
+    # =========================================================
+    # Cross Validation
+    # =========================================================
+    def model_cross_validation(self, pipeline, X, y) -> Dict[str, float]:
 
         skf = StratifiedKFold(
             n_splits=self.config.cross_validation_folds,
@@ -186,8 +188,16 @@ class Trainer:
 
             logger.info("Training fold %d", fold_idx + 1)
 
-            X_train, X_val = X.iloc[train_idx], X.iloc[val_idx]
-            y_train, y_val = y.iloc[train_idx], y.iloc[val_idx]
+            X_train, X_val = X.iloc[train_idx].copy(), X.iloc[val_idx].copy()
+            y_train, y_val = y.iloc[train_idx].copy(), y.iloc[val_idx].copy()
+
+            # Apply SMOTE to training fold if enabled
+            if self.config.apply_smote:
+                logger.info("Applying SMOTE to fold training data")
+                smote = SMOTE(random_state=self.config.random_state)
+                X_train_array = X_train.values
+                X_train_smote, y_train = smote.fit_resample(X_train_array, y_train)
+                X_train = pd.DataFrame(X_train_smote, columns=X_train.columns)
 
             pipeline.fit(X_train, y_train)
 
@@ -246,7 +256,17 @@ class Trainer:
 
         logger.info("Train-test split completed")
 
-        pipeline = self._build_pipeline(X_train)
+        # Apply SMOTE to training data if enabled
+        if self.config.apply_smote:
+            logger.info("Applying SMOTE to training data")
+            smote = SMOTE(random_state=self.config.random_state)
+            X_train_array = X_train.values
+            X_train_smote, y_train = smote.fit_resample(X_train_array, y_train)
+            X_train = pd.DataFrame(X_train_smote, columns=X_train.columns)
+            logger.info(f"SMOTE applied. New training set size: {X_train.shape}")
+
+        # Build unified pipeline
+        pipeline = self._build_pipeline()
 
         # -----------------------------------------------------
         # Stratified K-Fold Cross Validation
@@ -263,6 +283,7 @@ class Trainer:
         # -----------------------------------------------------
         # Final Training on Full Training Data
         # -----------------------------------------------------
+        logger.info("Final model training on complete training set")
         pipeline.fit(X_train, y_train)
 
         logger.info("Final model training completed")
@@ -287,10 +308,11 @@ class Trainer:
 
         os.makedirs(version_path, exist_ok=True)
 
-        model_path = os.path.join(version_path, "model.pkl")
+        # Save complete unified pipeline as .pkl
+        model_path = os.path.join(version_path, "complete_pipeline.pkl")
         joblib.dump(pipeline, model_path)
 
-        logger.info(f"Model saved at {model_path}")
+        logger.info(f"Complete unified pipeline saved at {model_path}")
 
         # Save predictions
         predictions_df = pd.DataFrame({
@@ -307,7 +329,7 @@ class Trainer:
         # -----------------------------------------------------
         # Metadata Saving
         # -----------------------------------------------------
-        feature_names = self._get_feature_names(pipeline)
+        feature_names = self._get_feature_names(pipeline, X_train.head())
 
         metadata = self._extract_model_metadata(
             pipeline,
@@ -326,3 +348,5 @@ class Trainer:
         logger.info("Training pipeline completed successfully")
 
         return model_path, metrics
+
+

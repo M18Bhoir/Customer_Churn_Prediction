@@ -21,10 +21,23 @@ class RandomForestConfig(BaseModel):
     n_jobs: int = -1
 
 
+class XGBoostConfig(BaseModel):
+    n_estimators: int = 100
+    max_depth: int = 6
+    learning_rate: float = 0.1
+    subsample: float = 0.8
+    colsample_bytree: float = 0.8
+    gamma: float = 0
+    min_child_weight: int = 1
+    random_state: int = 42
+    n_jobs: int = -1
+
+
 class ModelConfig(BaseModel):
     type: str
-    logistic_regression: Optional[LogisticRegressionConfig]
-    random_forest: Optional[RandomForestConfig]
+    logistic_regression: Optional[LogisticRegressionConfig] = None
+    random_forest: Optional[RandomForestConfig] = None
+    xgboost: Optional[XGBoostConfig] = None
 
 
 class TrainConfig(BaseModel):
@@ -35,3 +48,5 @@ class TrainConfig(BaseModel):
     target_column: str
     cross_validation_folds: int
     model: ModelConfig
+    apply_smote: bool = True
+    exclude_columns: list = ["customer_id", "age", "monthly_charges"]
